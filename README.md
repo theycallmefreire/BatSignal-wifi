@@ -1,175 +1,161 @@
 <p align="center">
-  <img src="imagens/logo.png" alt="BatSignal logo" width="200">
+  <img src="imagens/logo.png" alt="BatSignal logo" width="180">
 </p>
 
 # BatSignal
 
 **Understand your Wi-Fi coverage, one room at a time.**
 
-BatSignal is a Python desktop application that records Wi-Fi signal strength across rooms and turns the measurements into charts and reports. Use it to compare locations for your computer, investigate areas with weaker reception, and document changes to your setup.
+BatSignal is a Windows desktop application for recording and comparing Wi-Fi signal strength across rooms. Collect measurements, inspect charts, compare surveys before and after a change, and export results as JSON or Excel.
 
-Built with Tkinter, pandas, and Matplotlib. Signal collection currently targets **Windows**, and the application interface is in **Portuguese**.
+Built with Python, Tkinter, Matplotlib, and openpyxl. The interface is in Portuguese; the collector recognizes Portuguese, English, Spanish, French, and German `netsh` field labels.
 
 ## Features
 
-- **Room-by-room collection:** assign a room name and configure the collection duration and sampling interval.
-- **Live measurement log:** follow signal readings as they are collected.
-- **Room summaries:** review minimum, maximum, and average signal strength.
-- **Visual comparisons:** inspect readings in line charts and compare room averages in a sorted bar chart.
-- **Saved surveys:** save measurements as JSON, reload previous surveys, or delete saved files through the interface.
-- **Excel export:** create an `.xlsx` workbook with one worksheet per room and a summary worksheet.
+- **Configurable collection:** choose a room, duration, sampling interval, and optional Wi-Fi interface.
+- **Responsive controls:** follow live readings, view progress, and cancel a collection.
+- **Network context:** new readings include SSID, BSSID, interface name, and a timestamp with UTC offset. The log highlights network changes during collection.
+- **Reliable local storage:** validated JSON, safe filenames, atomic saves, legacy-file imports, and prompts for unsaved work.
+- **Clear charts:** full 0–100% signal scales, reusable colors and markers, and room summaries.
+- **Before/after comparison:** compare rooms with matching names in two saved surveys.
+- **Excel reports:** one worksheet per room plus a summary; worksheet names are cleaned and deduplicated automatically.
 
-## Requirements
+Signal percentage is reported by Windows. It does not measure internet speed, latency, packet loss, or guarantee connection quality.
 
-- Windows with an active Wi-Fi connection and access to `netsh`.
-- **Portuguese `netsh` output:** the current collector looks for the field named `Sinal`. Output in other languages is not currently handled.
-- Python with Tkinter support. **Python 3.11 is the suggested starting point for the repository's existing dependency pins**; newer Python versions may require dependency updates.
-- Git to clone the repository, or a downloaded copy of its source files.
+## Quick start
 
-BatSignal records the signal percentage reported by Windows. It does not measure download speed, latency, packet loss, or internet availability.
+### Portable Windows build
 
-## Installation
+If you have a `BatSignal-Windows.zip` build, extract the **entire archive** and run `BatSignal/BatSignal.exe`. Keep the executable and its `_internal/` folder together. Python installation is not required for this build.
 
-Run the following commands in PowerShell.
+The portable build is unsigned. There is currently no installer or automatic update mechanism.
 
-### 1. Download the source
+### Run from source
+
+Requirements: Windows, an active Wi-Fi connection, and **Python 3.12 or 3.13 with Tkinter**. Python 3.12 is used for the local build; the CI workflow is configured to check both versions.
+
+Run in PowerShell:
 
 ```powershell
 git clone https://github.com/theycallmefreire/BatSignal-wifi.git
 cd BatSignal-wifi
-```
-
-### 2. Create a virtual environment
-
-With Python 3.11 installed and available through the Windows Python launcher:
-
-```powershell
-py -3.11 -m venv .venv
-```
-
-If you use `python -m venv .venv` instead, first check that `python --version` points to your intended Python installation.
-
-### 3. Install dependencies
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install "numpy<2" -r requeriments.txt Pillow
-```
-
-The dependency file is currently named **`requeriments.txt`**, exactly as shown above. Pillow is imported by the application for image handling and is included explicitly in this command. The NumPy constraint helps avoid binary compatibility problems with the older pandas and Matplotlib versions pinned in the repository; see the [NumPy troubleshooting guide](https://numpy.org/doc/stable/user/troubleshooting-importerror.html#downstream-importerror-attributeerror-or-c-api-abi-incompatibility).
-
-### 4. Launch BatSignal
-
-```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe app_main.py
 ```
 
-Run the application from the repository root so it can locate the `imagens/` assets and use the expected `dados/` storage folder. These commands use the virtual environment directly, so activation is optional.
+Check `python --version` before creating the environment. Virtual-environment activation is optional when using its interpreter directly. The old `requeriments.txt` filename is retained as a compatibility alias.
 
 ## Usage
 
-1. Connect your computer to the Wi-Fi network you want to evaluate.
-2. Move to the first location and enter a room name in **Nome do cômodo**.
-3. Set **Duração (segundos)** and **Intervalo (segundos)**. The defaults are **60 seconds** and **5 seconds**, respectively. Both values must be positive integers, and the interval must not exceed the duration.
-4. Click **Iniciar Coleta** (Start collection) and keep the device in place until collection finishes. Successful readings appear in the status log.
-5. Review the summary. Choose **Refazer Coleta** (Repeat collection) to measure the same room again, or **Próximo Cômodo** (Next room) to prepare another room.
-6. Click **Ver Gráficos** (View charts) to inspect the collected measurements.
-7. Enter a survey name in **Nome do Mapeamento**, then click **Salvar Mapeamento** (Save survey).
-8. Use **Exportar Tudo** (Export all) to save an Excel workbook, or **Carregar Mapeamento** (Load survey) to open a previously saved survey.
+1. Connect to the Wi-Fi network you want to evaluate.
+2. Enter a room name in **Cômodo**. For multiple locations in one room, use names such as `Office - Desk` and `Office - Door`.
+3. Set **Duração (s)** and **Intervalo (s)**. Defaults are 60 and 5 seconds. Both must be positive integers, with the interval no greater than the duration.
+4. Leave **Interface (opcional)** blank if there is only one connected Wi-Fi adapter. Otherwise, enter its name as shown by `netsh wlan show interfaces`.
+5. Click **Iniciar coleta** and keep the computer in place. **Cancelar coleta** discards the current attempt while preserving existing room data.
+6. Review the summary. Use **Próximo cômodo** for another location or **Refazer coleta** to repeat the last room.
+7. Click **Ver gráficos** to inspect readings and room averages.
+8. Name the survey and use **Salvar JSON**. **Exportar Excel** creates a separate workbook.
+9. Use **Carregar JSON** to choose a saved survey or import a JSON file from another location.
 
-A new successful collection using an existing room name replaces that room's measurements in the current survey. Save separate surveys when you want to preserve results from different sessions.
+A successful collection using an existing room name replaces that room after confirmation. Cancelled, empty, and unexpectedly failed collections leave its previous readings intact. Temporary collection errors are displayed in the log; if a collection completes with valid readings, those readings are kept.
 
-## Understanding the results
+### Compare before and after
 
-### Line charts
+Save separate surveys before and after changing your setup, then click **Comparar antes/depois** and select the two JSON files in order.
 
-Each room has its own subplot showing signal strength by **measurement number**, with a dashed line marking the room average. The horizontal axis is a sample index, not elapsed time.
+Only rooms with **exactly matching names** are compared. The chart shows average signal and the change in **percentage points**. Use the same device, orientation, locations, and sampling settings for meaningful comparisons. Comparison does not modify either survey.
 
-### Bar chart
+The [example surveys](examples/) contain synthetic measurements that can be imported without running a real Wi-Fi collection.
 
-Rooms are ordered from highest to lowest average signal strength. The current color rules are:
+## Charts
+
+These charts were rendered by BatSignal using the synthetic surveys in `examples/`.
+
+![Signal comparison across six rooms](imagens/signal.png)
+
+![Before-and-after comparison](imagens/comparison.png)
+
+The line chart uses measurement number on the horizontal axis and shows a dashed average for each room. It does not imply that samples in different rooms were taken simultaneously.
+
+The bar chart ranks rooms by average signal and shows minimum/maximum values. Its application-specific color boundaries are:
 
 | Average signal | Color |
 | --- | --- |
 | Greater than 95% | Green |
 | Greater than 92%, up to and including 95% | Orange |
-| 92% or lower | Red |
+| 92% or lower | Vermilion |
 
-These are application-specific thresholds, not guarantees of connection performance. The chart legend currently uses simplified boundary labels; the table above reflects the implemented comparisons.
+These thresholds are visual aids, not networking standards.
 
-### Collecting comparable measurements
+## Storage and exports
 
-- Use the same device, sampling settings, and device orientation across locations.
-- Stay in one position during each collection.
-- Use distinct room names for multiple measurement points, such as `Office - Desk` and `Office - Door`.
-- Save separate surveys before and after moving a router or changing your setup.
+- **Source checkout:** surveys and rotating logs are stored in `dados/` next to the source files, regardless of the launch directory.
+- **Portable build:** surveys and logs are stored in `%LOCALAPPDATA%\BatSignal\dados`.
+- **Custom location:** set the `BATSIGNAL_DATA_DIR` environment variable before launching.
+- JSON writes and Excel exports use a temporary file followed by replacement, protecting an existing file if writing fails.
+- JSON saving and Excel export are separate actions. Exporting a workbook does not mark the JSON survey as saved.
 
-## Data and exports
-
-Saved surveys are stored locally in `dados/`, relative to the directory from which the application is launched. The folder is created when needed. Filenames combine the survey name with a timestamp.
-
-Example of the current JSON format:
+New surveys use schema version 2. Older files containing `nome`, `data`, and `comodos` remain supported.
 
 ```json
 {
+  "schema_version": 2,
   "nome": "Home - Baseline",
-  "data": "2026-04-01 14:30:00",
+  "data": "2026-04-01T14:30:00-03:00",
   "comodos": {
     "Office": [
-      { "tempo": "14:29:00", "forca": 94 },
-      { "tempo": "14:29:05", "forca": 93 }
-    ],
-    "Living Room": [
-      { "tempo": "14:30:00", "forca": 98 }
+      {
+        "tempo": "14:29:00",
+        "timestamp": "2026-04-01T14:29:00-03:00",
+        "forca": 74,
+        "interface": "Wi-Fi",
+        "ssid": "Example network",
+        "bssid": "02:00:00:00:00:01"
+      }
     ]
   }
 }
 ```
 
-The keys retain their current Portuguese names: `nome` is the survey name, `data` is its save date and time, `comodos` contains the rooms, `tempo` is the reading time, and `forca` is the signal percentage.
-
-Excel exports contain the raw readings for each room and a **Resumo** (Summary) worksheet with minimum, maximum, average, and measurement count. JSON saving and Excel export are separate actions.
-
-## Project structure
-
-```text
-BatSignal-wifi/
-├── app_main.py          # Tkinter interface, collection workflow, and Excel export
-├── wifi_coleta.py       # Wi-Fi signal collection through Windows netsh
-├── wifi_dados.py        # JSON persistence and saved-survey management
-├── wifi_graficos.py     # Matplotlib line and bar charts
-├── requeriments.txt     # Pinned Python dependencies (current filename)
-├── imagens/            # Application logo and icon assets
-├── dados/              # Local surveys; created at runtime
-├── PROJECT_CONTEXT.md  # Additional project background and future ideas
-└── README.md
-```
-
-## Current limitations
-
-- Collection depends on Windows `netsh` output and the Portuguese `Sinal` label. Linux, macOS, and other output languages are not currently supported by the collector.
-- Both chart types use a fixed vertical range of **80–105%**, so weaker readings can fall outside the visible area. Check raw data or Excel exports when interpreting low signal levels.
-- The line chart has a fixed palette of **five colors**; plotting more than five rooms currently raises an error.
-- Readings store a time of day and a signal percentage, without network or access-point identifiers. Surveys cannot automatically distinguish changes in network or access point.
-- The application provides room comparisons; it does not generate a floor-plan heatmap.
+The original Portuguese keys are preserved for compatibility. Excel includes these reading fields and a **Resumo** worksheet with room names, worksheet mappings, minimum, maximum, average, and sample count. Surveys may contain network identifiers and room names; review them before sharing.
 
 ## Troubleshooting
 
 | Problem | What to check |
 | --- | --- |
-| No signal readings appear | Run `netsh wlan show interfaces` in a terminal. Confirm that Wi-Fi is connected and the output contains a numeric `Sinal` field. |
-| The icon or other assets cannot be found | Launch the application from the repository root and keep the `imagens/` folder in place. |
-| A Python module is missing | Install dependencies with the same `.venv` interpreter used to launch the app. The `PIL` import is supplied by Pillow. |
-| NumPy or pandas reports a binary incompatibility | Recreate the environment using the suggested Python version and the installation command above, including `numpy<2`. |
-| Charts fail or omit weak readings | Check the room count and the chart limits described above; use the Excel export to inspect raw values. |
-| Excel export fails for a room name | Use short, distinct names without `:`, `\`, `/`, `?`, `*`, `[` or `]`. Avoid `Resumo`, which is reserved for the summary worksheet, and names that become identical after truncation to 31 characters. |
+| No readings | Run `netsh wlan show interfaces`; check that Wi-Fi is connected and a signal percentage is present. |
+| Windows refuses the query | Check the WLAN service and Windows location permissions. BatSignal does not change these settings. |
+| Multiple connected adapters | Fill in the optional Interface field with the intended adapter name. |
+| Unsupported output language | Current parsing recognizes PT/EN/ES/FR/DE labels. Other languages require a collector update. |
+| Excel cannot be saved | Close the destination workbook in Excel and verify that the selected folder is writable. |
+| A survey does not appear | Invalid JSON files are skipped when listing surveys. Import the file directly to see its validation error. |
+| Missing Python module | Install `requirements.txt` using the same virtual environment used to launch the app. |
+| Unexpected error | Check `batsignal.log` in the data directory. |
 
-## Contributing
+## Development
 
-Bug reports and focused pull requests are welcome. When reporting a problem, include your Windows display language, Python version, steps to reproduce it, and any error messages. Remove personal network information from logs or screenshots before sharing them.
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe scripts/build_windows.py
+```
 
-For a proposed change, describe the behavior it addresses and how you verified it. Useful areas for contributions include collection reliability, chart handling, automated tests, and interface translation.
+The build command produces `dist/BatSignal-Windows.zip`. GitHub Actions runs Windows tests for Python 3.12/3.13 and creates a build artifact after checks pass.
+
+| Module | Responsibility |
+| --- | --- |
+| `app_main.py` | Tkinter interface and main-thread event handling |
+| `wifi_coleta.py` | netsh parsing, collection worker, and cancellation |
+| `wifi_dados.py` | JSON validation and local persistence |
+| `wifi_exportacao.py` | Safe Excel export |
+| `wifi_graficos.py` | Charts and survey comparison |
+| `app_paths.py` | Resource and storage paths |
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for development guidance and [ROADMAP.md](ROADMAP.md) for priorities and remaining work. Real Wi-Fi behavior still needs validation across hardware and Windows configurations. A floor-plan heatmap and Linux/macOS collectors are future work.
 
 ## License
 
-The repository does not currently include a `LICENSE` file. A license should be added to explicitly document the terms for reuse and distribution.
+Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution. Third-party dependencies retain their own licenses; the portable build includes their notices.

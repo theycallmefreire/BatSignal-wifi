@@ -1,4 +1,9 @@
-# 🦇 BatSignal - Project Context
+# BatSignal — historical project context
+
+> This file describes the original prototype and earlier ideas. Some details below
+> are historical and do not match the current implementation. Use [README.md](README.md)
+> for current behavior, [ROADMAP.md](ROADMAP.md) for implemented priorities and future work,
+> and [CONTRIBUTING.md](CONTRIBUTING.md) for development instructions.
 
 **Autor:** Guilherme Barbosa Freire Silva  
 **Artigo Original:** [Medium - Como eu criei um mapa de sinal Wi-Fi](https://theycallmefreire.medium.com/como-eu-criei-um-mapa-de-sinal-wi-fi-e-analisei-a-qualidade-em-cada-c%C3%B4modo-da-minha-casa-da08bfc1fbca)  

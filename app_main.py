@@ -1,477 +1,533 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from PIL import Image, ImageTk
-import time
-from datetime import datetime
-import threading
-import pandas as pd
-import os
+"""BatSignal desktop application. All Tk calls run on the main thread."""
 
-# Importa os módulos que criamos
-from wifi_coleta import get_wifi_strength
-from wifi_graficos import criar_grafico_linha, criar_grafico_barras
-from wifi_dados import salvar_mapeamento, carregar_mapeamento, listar_mapeamentos
+import logging
+import threading
+import time
+import tkinter as tk
+from functools import partial
+from logging.handlers import RotatingFileHandler
+from queue import Empty, Queue
+from tkinter import filedialog, messagebox, ttk
+
+from PIL import Image, ImageTk
+
+from app_paths import data_directory, resource_path
+from wifi_coleta import collect_samples, get_wifi_reading
+from wifi_dados import (
+    carregar_mapeamento,
+    deletar_mapeamento,
+    listar_mapeamentos,
+    salvar_mapeamento,
+)
+from wifi_exportacao import exportar_mapeamento_excel
+from wifi_graficos import (
+    comparar_mapeamentos,
+    criar_grafico_barras,
+    criar_grafico_comparacao,
+    criar_grafico_linha,
+)
+
+logger = logging.getLogger(__name__)
+
 
 class AppWiFiComodos:
-    def __init__(self, root):
+    def __init__(self, root, reader=get_wifi_reading):
         self.root = root
-        self.root.title("BatSignal - Mapeador de Wi-Fi por Cômodo")
-        self.root.geometry("900x700")
-        self.root.resizable(True, True)
-        self.root.iconbitmap('.\imagens\logo.ico')
-        
-        # Dicionário pra armazenar dados de cada cômodo
+        self.reader = reader
         self.dados_por_comodo = {}
         self.comodo_atual = None
         self.coletando = False
-        
-        # ===== Carrega Logo =====
-        self.carregar_logo()
-        
-        # ===== Frame Superior - Banner com Logo =====
-        frame_top = tk.Frame(root, bg="#000000", height=120)
-        frame_top.pack(fill=tk.X)
-        frame_top.pack_propagate(False)
-        
-        # Container centralizado
-        banner_content = tk.Frame(frame_top, bg="#000000")
-        banner_content.pack(expand=True, pady=10)
-        
-        # Logo
-        if self.logo_photo:
-            logo_label = tk.Label(banner_content, image=self.logo_photo, bg="#000000")
-            logo_label.pack(side=tk.LEFT, padx=20)
-        
-        # Texto ao lado
-        text_frame = tk.Frame(banner_content, bg="#000000")
-        text_frame.pack(side=tk.LEFT, padx=20)
-        
-        titulo = tk.Label(text_frame, text="BatSignal", 
-                         font=("Arial", 16, "bold"), bg="#000000", fg="#0078d4")
-        titulo.pack(anchor=tk.W)
-        
-        subtitulo = tk.Label(text_frame, text="Mapeador de Wi-Fi por Cômodo", 
-                            font=("Arial", 14), bg="#000000", fg="#666666")
-        subtitulo.pack(anchor=tk.W)
-        
-        # ===== Frame de Seleção de Cômodo =====
-        frame_comodo = ttk.LabelFrame(root, text="Cômodo Atual", padding="10")
-        frame_comodo.pack(fill=tk.X, padx=10, pady=10)
-        
-        ttk.Label(frame_comodo, text="Nome do cômodo:").pack(side=tk.LEFT, padx=5)
-        self.comodo_var = tk.StringVar(value="Sala")
-        self.entry_comodo = ttk.Entry(frame_comodo, textvariable=self.comodo_var, width=20)
-        self.entry_comodo.pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(frame_comodo, text="(ex: Sala, Quarto, Cozinha)").pack(side=tk.LEFT, padx=5)
-        
-        # ===== Frame de Controles =====
-        frame_controls = ttk.LabelFrame(root, text="Configuração da Coleta", padding="10")
-        frame_controls.pack(fill=tk.X, padx=10, pady=10)
-        
-        ttk.Label(frame_controls, text="Duração (segundos):").pack(side=tk.LEFT, padx=5)
-        self.duracao_var = tk.StringVar(value="60")
-        ttk.Entry(frame_controls, textvariable=self.duracao_var, width=10).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(frame_controls, text="Intervalo (segundos):").pack(side=tk.LEFT, padx=5)
-        self.intervalo_var = tk.StringVar(value="5")
-        ttk.Entry(frame_controls, textvariable=self.intervalo_var, width=10).pack(side=tk.LEFT, padx=5)
-        
-        # ===== Frame de Botões =====
-        frame_buttons = ttk.Frame(root, padding="10")
-        frame_buttons.pack(fill=tk.X, padx=10)
-        
-        self.btn_iniciar = ttk.Button(frame_buttons, text="Iniciar Coleta", 
-                                       command=self.iniciar_coleta)
-        self.btn_iniciar.pack(side=tk.LEFT, padx=5)
-        
-        self.btn_refazer = ttk.Button(frame_buttons, text="Refazer Coleta", 
-                                       command=self.refazer_coleta, state=tk.DISABLED)
-        self.btn_refazer.pack(side=tk.LEFT, padx=5)
-        
-        self.btn_proximo = ttk.Button(frame_buttons, text="Próximo Cômodo", 
-                                       command=self.proximo_comodo, state=tk.DISABLED)
-        self.btn_proximo.pack(side=tk.LEFT, padx=5)
-        
-        self.btn_graficos = ttk.Button(frame_buttons, text="Ver Gráficos", 
-                                        command=self.mostrar_graficos, state=tk.DISABLED)
-        self.btn_graficos.pack(side=tk.LEFT, padx=5)
-        
-        self.btn_salvar = ttk.Button(frame_buttons, text="Salvar Mapeamento", 
-                                      command=self.salvar_dados, state=tk.NORMAL)
-        self.btn_salvar.pack(side=tk.LEFT, padx=5)
-        
-        self.btn_carregar = ttk.Button(frame_buttons, text="Carregar Mapeamento", 
-                                        command=self.carregar_dados)
-        self.btn_carregar.pack(side=tk.LEFT, padx=5)
-        
-        self.btn_exportar = ttk.Button(frame_buttons, text="Exportar Tudo", 
-                                        command=self.exportar_excel, state=tk.DISABLED)
-        self.btn_exportar.pack(side=tk.LEFT, padx=5)
-        
-        # ===== Frame de Status =====
-        frame_status = ttk.LabelFrame(root, text="Status", padding="10")
-        frame_status.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # Text widget
-        self.text_output = tk.Text(frame_status, height=12, width=85, state=tk.DISABLED)
-        self.text_output.pack(fill=tk.BOTH, expand=True)
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(frame_status, orient=tk.VERTICAL, command=self.text_output.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.text_output.config(yscrollcommand=scrollbar.set)
-        
-        # ===== Frame de Resumo dos Cômodos =====
-        frame_resumo = ttk.LabelFrame(root, text="Cômodos Mapeados", padding="10")
-        frame_resumo.pack(fill=tk.X, padx=10, pady=10)
-        
-        self.label_resumo = ttk.Label(frame_resumo, text="Nenhum cômodo mapeado ainda")
-        self.label_resumo.pack()
-        
-        # ===== Frame com Nome do Mapeamento =====
-        frame_nome = ttk.LabelFrame(root, text="Nome do Mapeamento", padding="10")
-        frame_nome.pack(fill=tk.X, padx=10, pady=10)
-        
-        ttk.Label(frame_nome, text="Nome:").pack(side=tk.LEFT, padx=5)
-        self.nome_mapeamento_var = tk.StringVar(value="Mapeamento")
-        ttk.Entry(frame_nome, textvariable=self.nome_mapeamento_var, width=30).pack(side=tk.LEFT, padx=5)
-        
-        ttk.Label(frame_nome, text="(ex: Casa - Dia 1, Apartamento, etc)").pack(side=tk.LEFT, padx=5)
-    
-    def carregar_logo(self):
-        """Carrega a logo se existir"""
-        self.logo_photo = None
-        
-        if os.path.exists(".\imagens\logo.png"):
-            try:
-                img = Image.open(".\imagens\logo.png")
-                img.thumbnail((100, 100), Image.Resampling.LANCZOS)
-                self.logo_photo = ImageTk.PhotoImage(img)
-            except Exception as e:
-                print(f"Erro ao carregar logo: {e}")
-    
-    def atualizar_texto(self, texto):
-        """Atualiza o text widget de forma thread-safe"""
-        self.text_output.config(state=tk.NORMAL)
-        self.text_output.insert(tk.END, texto + "\n")
-        self.text_output.see(tk.END)
-        self.text_output.config(state=tk.DISABLED)
-        self.root.update()
-    
-    def limpar_texto(self):
-        """Limpa o text widget"""
-        self.text_output.config(state=tk.NORMAL)
-        self.text_output.delete(1.0, tk.END)
-        self.text_output.config(state=tk.DISABLED)
-    
-    def atualizar_resumo(self):
-        """Atualiza o label com os cômodos mapeados"""
-        if not self.dados_por_comodo:
-            self.label_resumo.config(text="Nenhum cômodo mapeado ainda")
-        else:
-            comodos_list = []
-            for comodo, dados in self.dados_por_comodo.items():
-                forcas = [d['forca'] for d in dados]
-                media = sum(forcas) / len(forcas)
-                comodos_list.append(f"• {comodo}: {media:.1f}% (min: {min(forcas)}%, max: {max(forcas)}%)")
-            
-            texto = "Cômodos coletados:\n" + "\n".join(comodos_list)
-            self.label_resumo.config(text=texto)
-    
-    def coleta_em_thread(self, segundos, intervalo, comodo):
-        """Faz a coleta em uma thread separada"""
-        dados = []
-        self.coletando = True
-        tempo_inicio = time.time()
-        tempo_decorrido = 0
-        
-        self.atualizar_texto(f"\n🦇 Coletando dados do cômodo: {comodo}")
-        self.atualizar_texto(f"   Duração: {segundos}s | Intervalo: {intervalo}s\n")
-        
-        while tempo_decorrido < segundos and self.coletando:
-            agora = datetime.now().strftime("%H:%M:%S")
-            strength = get_wifi_strength()
-            
-            if strength is not None:
-                dados.append({
-                    'tempo': agora,
-                    'forca': strength
-                })
-                self.atualizar_texto(f"[{agora}] Sinal: {strength}%")
-            else:
-                self.atualizar_texto(f"[{agora}] ❌ Erro ao coletar")
-            
-            time.sleep(intervalo)
-            tempo_decorrido = time.time() - tempo_inicio
-        
-        # Finaliza e mostra resumo
-        if self.coletando:
-            self.atualizar_texto(f"\n✓ Coleta finalizada!")
-            if dados:
-                forcas = [d['forca'] for d in dados]
-                self.atualizar_texto(f"\n📊 Resumo - {comodo}:")
-                self.atualizar_texto(f"   Total de medições: {len(forcas)}")
-                self.atualizar_texto(f"   Mínimo: {min(forcas)}%")
-                self.atualizar_texto(f"   Máximo: {max(forcas)}%")
-                self.atualizar_texto(f"   Médio: {sum(forcas) / len(forcas):.1f}%")
-                
-                # Armazena os dados
-                self.dados_por_comodo[comodo] = dados
-                self.comodo_atual = comodo
-                self.atualizar_resumo()
-                
-                # Habilita botões
-                self.btn_refazer.config(state=tk.NORMAL)
-                self.btn_proximo.config(state=tk.NORMAL)
-                self.btn_graficos.config(state=tk.NORMAL)
-                self.btn_exportar.config(state=tk.NORMAL)
-        else:
-            self.atualizar_texto("\n⏸️ Coleta cancelada")
-        
-        self.coletando = False
-        self.btn_iniciar.config(state=tk.NORMAL)
-    
-    def iniciar_coleta(self):
-        """Inicia a coleta"""
+        self.dirty = False
+        self._closing = False
+        self._events = Queue()
+        self._stop = threading.Event()
+        self._worker = None
+        self._last_network = None
+        self.root.title("BatSignal — Mapeador de Wi-Fi")
+        self.root.geometry("1050x800")
+        self.root.minsize(900, 720)
         try:
-            comodo = self.comodo_var.get().strip()
-            
-            if not comodo:
-                messagebox.showerror("Erro", "Digite o nome do cômodo")
-                return
-            
-            segundos = int(self.duracao_var.get())
-            intervalo = int(self.intervalo_var.get())
-            
-            if segundos <= 0 or intervalo <= 0:
-                messagebox.showerror("Erro", "Valores devem ser maiores que 0")
-                return
-            
-            if intervalo > segundos:
-                messagebox.showerror("Erro", "Intervalo não pode ser maior que duração")
-                return
-            
-            self.limpar_texto()
-            self.btn_iniciar.config(state=tk.DISABLED)
-            self.btn_refazer.config(state=tk.DISABLED)
-            self.btn_proximo.config(state=tk.DISABLED)
-            self.btn_graficos.config(state=tk.DISABLED)
-            
-            thread = threading.Thread(target=self.coleta_em_thread, 
-                                     args=(segundos, intervalo, comodo), daemon=True)
-            thread.start()
-        
+            self.root.iconbitmap(str(resource_path("imagens/logo.ico")))
+        except tk.TclError:
+            logger.debug("Application icon is unavailable")
+        self._build_ui()
+        self.root.protocol("WM_DELETE_WINDOW", self.fechar)
+        self._poll_id = self.root.after(100, self._process_events)
+
+    def _build_ui(self):
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(3, weight=1)
+        banner = tk.Frame(self.root, bg="#101A27")
+        banner.grid(row=0, column=0, sticky="ew")
+        self.logo_photo = None
+        try:
+            with Image.open(resource_path("imagens/logo.png")) as image:
+                image.thumbnail((95, 95), Image.Resampling.LANCZOS)
+                self.logo_photo = ImageTk.PhotoImage(image)
+            tk.Label(banner, image=self.logo_photo, bg="#101A27").pack(side="left", padx=20, pady=8)
+        except (OSError, tk.TclError):
+            logger.warning("Could not load application logo")
+        tk.Label(
+            banner, text="BatSignal", font=("Segoe UI", 23, "bold"), bg="#101A27", fg="#55BFFF"
+        ).pack(anchor="w", padx=12, pady=(15, 0))
+        tk.Label(
+            banner,
+            text="Compare a cobertura Wi-Fi, cômodo por cômodo.",
+            font=("Segoe UI", 11),
+            bg="#101A27",
+            fg="white",
+        ).pack(anchor="w", padx=12, pady=(0, 15))
+
+        settings = ttk.LabelFrame(self.root, text="Configuração da coleta", padding=12)
+        settings.grid(row=1, column=0, sticky="ew", padx=16, pady=12)
+        self.comodo_var = tk.StringVar(value="Sala")
+        self.duracao_var = tk.StringVar(value="60")
+        self.intervalo_var = tk.StringVar(value="5")
+        self.interface_var = tk.StringVar()
+        self._entries = []
+        for column, (label, variable, width) in enumerate(
+            [
+                ("Cômodo", self.comodo_var, 23),
+                ("Duração (s)", self.duracao_var, 12),
+                ("Intervalo (s)", self.intervalo_var, 12),
+                ("Interface (opcional)", self.interface_var, 22),
+            ]
+        ):
+            ttk.Label(settings, text=label).grid(row=0, column=column, sticky="w", padx=6)
+            entry = ttk.Entry(settings, textvariable=variable, width=width)
+            entry.grid(row=1, column=column, sticky="ew", padx=6, pady=5)
+            self._entries.append(entry)
+            settings.columnconfigure(column, weight=1)
+        self.entry_comodo = self._entries[0]
+        ttk.Label(
+            settings,
+            text="Mantenha o computador parado durante a coleta. "
+            "O percentual de sinal não mede a velocidade da internet.",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", padx=6, pady=(6, 0))
+
+        actions = ttk.Frame(self.root)
+        actions.grid(row=2, column=0, sticky="ew", padx=16)
+        self.btn_iniciar = ttk.Button(actions, text="Iniciar coleta", command=self.iniciar_coleta)
+        self.btn_cancelar = ttk.Button(
+            actions, text="Cancelar coleta", command=self.cancelar_coleta
+        )
+        self.btn_refazer = ttk.Button(actions, text="Refazer coleta", command=self.refazer_coleta)
+        self.btn_proximo = ttk.Button(actions, text="Próximo cômodo", command=self.proximo_comodo)
+        self.btn_graficos = ttk.Button(actions, text="Ver gráficos", command=self.mostrar_graficos)
+        self.btn_comparar = ttk.Button(actions, text="Comparar antes/depois", command=self.comparar)
+        for column, button in enumerate(
+            [
+                self.btn_iniciar,
+                self.btn_cancelar,
+                self.btn_refazer,
+                self.btn_proximo,
+                self.btn_graficos,
+                self.btn_comparar,
+            ]
+        ):
+            button.grid(row=0, column=column, padx=(0, 6), pady=4)
+        self.progress = ttk.Progressbar(actions, maximum=100)
+        self.progress.grid(row=1, column=0, columnspan=6, sticky="ew", pady=8)
+
+        log_frame = ttk.LabelFrame(self.root, text="Leituras e status", padding=10)
+        log_frame.grid(row=3, column=0, sticky="nsew", padx=16, pady=8)
+        log_frame.rowconfigure(1, weight=1)
+        log_frame.columnconfigure(0, weight=1)
+        self.network_var = tk.StringVar(value="Aguardando coleta")
+        ttk.Label(log_frame, textvariable=self.network_var).grid(
+            row=0, column=0, sticky="w", pady=(0, 6)
+        )
+        self.text_output = tk.Text(
+            log_frame, height=10, state="disabled", wrap="word", font=("Consolas", 10)
+        )
+        self.text_output.grid(row=1, column=0, sticky="nsew")
+        scrollbar = ttk.Scrollbar(log_frame, command=self.text_output.yview)
+        scrollbar.grid(row=1, column=1, sticky="ns")
+        self.text_output.config(yscrollcommand=scrollbar.set)
+
+        summary = ttk.LabelFrame(self.root, text="Cômodos mapeados", padding=10)
+        summary.grid(row=4, column=0, sticky="ew", padx=16, pady=6)
+        self.summary_list = tk.Listbox(summary, height=4, font=("Segoe UI", 10))
+        self.summary_list.pack(side="left", fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(summary, command=self.summary_list.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.summary_list.config(yscrollcommand=scrollbar.set)
+
+        storage = ttk.Frame(self.root, padding=(16, 6))
+        storage.grid(row=5, column=0, sticky="ew")
+        ttk.Label(storage, text="Mapeamento:").pack(side="left")
+        self.nome_mapeamento_var = tk.StringVar(value="Mapeamento")
+        name_entry = ttk.Entry(storage, textvariable=self.nome_mapeamento_var, width=24)
+        name_entry.pack(side="left", padx=8)
+        self._entries.append(name_entry)
+        self.btn_salvar = ttk.Button(storage, text="Salvar JSON", command=self.salvar_dados)
+        self.btn_carregar = ttk.Button(storage, text="Carregar JSON", command=self.carregar_dados)
+        self.btn_exportar = ttk.Button(storage, text="Exportar Excel", command=self.exportar_excel)
+        for button in (self.btn_salvar, self.btn_carregar, self.btn_exportar):
+            button.pack(side="left", padx=4)
+        ttk.Label(self.root, text=f"Dados locais: {data_directory()}", wraplength=990).grid(
+            row=6, column=0, sticky="w", padx=16, pady=(4, 10)
+        )
+        self._set_controls()
+
+    def _set_controls(self):
+        idle = not self.coletando
+        has_data = bool(self.dados_por_comodo)
+        states = {
+            self.btn_iniciar: idle,
+            self.btn_cancelar: not idle,
+            self.btn_refazer: idle and self.comodo_atual in self.dados_por_comodo,
+            self.btn_proximo: idle and has_data,
+            self.btn_graficos: idle and has_data,
+            self.btn_salvar: idle and has_data,
+            self.btn_exportar: idle and has_data,
+            self.btn_carregar: idle,
+            self.btn_comparar: idle,
+        }
+        for widget, enabled in states.items():
+            widget.config(state="normal" if enabled else "disabled")
+        for entry in self._entries:
+            entry.config(state="normal" if idle else "disabled")
+
+    def atualizar_texto(self, texto):
+        self.text_output.config(state="normal")
+        self.text_output.insert("end", texto + "\n")
+        self.text_output.see("end")
+        self.text_output.config(state="disabled")
+
+    def limpar_texto(self):
+        self.text_output.config(state="normal")
+        self.text_output.delete("1.0", "end")
+        self.text_output.config(state="disabled")
+
+    def atualizar_resumo(self):
+        self.summary_list.delete(0, "end")
+        for room, samples in self.dados_por_comodo.items():
+            values = [sample["forca"] for sample in samples]
+            self.summary_list.insert(
+                "end",
+                f"{room}: média {sum(values) / len(values):.1f}%  |  "
+                f"mín. {min(values):g}%  |  máx. {max(values):g}%  |  "
+                f"{len(values)} medições",
+            )
+
+    def iniciar_coleta(self):
+        if self.coletando:
+            return
+        room = self.comodo_var.get().strip()
+        if not room:
+            messagebox.showerror("Coleta", "Digite o nome do cômodo.", parent=self.root)
+            return
+        try:
+            duration, interval = int(self.duracao_var.get()), int(self.intervalo_var.get())
+            if duration <= 0 or interval <= 0 or interval > duration:
+                raise ValueError
         except ValueError:
-            messagebox.showerror("Erro", "Digite números válidos")
-    
+            messagebox.showerror(
+                "Coleta",
+                "Use segundos inteiros positivos e intervalo menor ou igual à duração.",
+                parent=self.root,
+            )
+            return
+        if room in self.dados_por_comodo and not messagebox.askyesno(
+            "Refazer coleta",
+            f"Substituir as medições de '{room}' ao concluir?\n"
+            "Se cancelar, as medições anteriores serão mantidas.",
+            parent=self.root,
+        ):
+            return
+        self.coletando = True
+        self._active_room = room
+        self._duration = duration
+        self._started = time.monotonic()
+        self._last_network = None
+        self._stop = threading.Event()
+        self._set_controls()
+        self.limpar_texto()
+        self.atualizar_texto(f"Coletando {room} — {duration}s, intervalo de {interval}s.")
+        self.network_var.set("Consultando a conexão Wi-Fi…")
+        self.progress["value"] = 0
+        reader = partial(self.reader, interface=self.interface_var.get().strip() or None)
+        self._worker = threading.Thread(
+            target=collect_samples,
+            args=(duration, interval, self._stop, self._events, reader),
+            daemon=True,
+        )
+        self._worker.start()
+
+    def cancelar_coleta(self):
+        if self.coletando:
+            self._stop.set()
+            self.btn_cancelar.config(state="disabled")
+            self.atualizar_texto("Cancelando… aguardando a consulta atual (até 5 segundos).")
+
+    def _process_events(self):
+        if self._closing:
+            return
+        # Bound work per tick so large queues cannot monopolize the event loop.
+        for _ in range(100):
+            try:
+                kind, payload = self._events.get_nowait()
+            except Empty:
+                break
+            if kind == "sample":
+                network = (payload["interface"], payload["ssid"], payload["bssid"])
+                if self._last_network and network != self._last_network:
+                    self.atualizar_texto(
+                        "Aviso: a interface, rede ou ponto de acesso mudou durante a coleta."
+                    )
+                self._last_network = network
+                self.network_var.set(
+                    f"Interface: {network[0] or '—'}  |  "
+                    f"Rede: {network[1] or '—'}  |  AP: {network[2] or '—'}"
+                )
+                self.atualizar_texto(f"[{payload['tempo']}] Sinal: {payload['forca']}%")
+            elif kind == "error":
+                self.atualizar_texto("Aviso: " + payload)
+            elif kind == "done":
+                self._finish_collection(payload)
+        if self.coletando:
+            self.progress["value"] = min(
+                99, (time.monotonic() - self._started) / self._duration * 100
+            )
+        self._poll_id = self.root.after(100, self._process_events)
+
+    def _finish_collection(self, result):
+        self.coletando = False
+        if result["cancelled"] or self._stop.is_set():
+            self.atualizar_texto("Coleta cancelada. As medições anteriores foram preservadas.")
+            self.progress["value"] = 0
+        elif result["error"]:
+            self.atualizar_texto(result["error"])
+            self.progress["value"] = 0
+        elif result["samples"]:
+            self.dados_por_comodo[self._active_room] = result["samples"]
+            self.comodo_atual = self._active_room
+            self.dirty = True
+            self.atualizar_resumo()
+            self.atualizar_texto(
+                f"Coleta concluída: {len(result['samples'])} medições válidas. "
+                "Salve o mapeamento para manter os resultados."
+            )
+            self.progress["value"] = 100
+        else:
+            self.atualizar_texto("Nenhuma medição válida. Os dados anteriores foram preservados.")
+            self.progress["value"] = 0
+        self._set_controls()
+
     def refazer_coleta(self):
-        """Refaz a coleta do cômodo atual"""
-        if self.comodo_atual:
+        if self.comodo_atual and not self.coletando:
             self.comodo_var.set(self.comodo_atual)
             self.iniciar_coleta()
-    
-    def proximo_comodo(self):
-        """Limpa pra coletar o próximo cômodo"""
-        self.limpar_texto()
-        self.comodo_var.set("")
-        self.entry_comodo.focus()
-        self.btn_refazer.config(state=tk.DISABLED)
-        self.btn_proximo.config(state=tk.DISABLED)
-        self.btn_salvar.config(state=tk.NORMAL)
-        self.atualizar_texto("➡️ Pronto pra coletar o próximo cômodo!\nDigite o nome e clique em 'Iniciar Coleta'")
-    
-    def mostrar_graficos(self):
-        """Abre uma nova janela com os gráficos"""
-        if not self.dados_por_comodo:
-            messagebox.showwarning("Aviso", "Nenhum dado para gerar gráficos")
-            return
-        
-        # Cria uma nova janela
-        janela_graficos = tk.Toplevel(self.root)
-        janela_graficos.title("Gráficos de Wi-Fi")
-        janela_graficos.geometry("1200x800")
-        
-        # Cria um notebook (abas)
-        notebook = ttk.Notebook(janela_graficos)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # ===== ABA 1: Gráfico de Linha =====
-        frame_linha = ttk.Frame(notebook)
-        notebook.add(frame_linha, text="Gráfico de Linha")
-        criar_grafico_linha(self.dados_por_comodo, frame_linha)
-        
-        # ===== ABA 2: Gráfico de Barras =====
-        frame_barras = ttk.Frame(notebook)
-        notebook.add(frame_barras, text="Gráfico de Barras")
-        criar_grafico_barras(self.dados_por_comodo, frame_barras)
-    
-    def salvar_dados(self):
-        """Salva o mapeamento atual em JSON"""
-        if not self.dados_por_comodo:
-            messagebox.showwarning("Aviso", "Nenhum dado para salvar")
-            return
-        
-        nome = self.nome_mapeamento_var.get().strip()
-        
-        if not nome:
-            messagebox.showerror("Erro", "Digite um nome para o mapeamento")
-            return
-        
-        try:
-            caminho = salvar_mapeamento(nome, self.dados_por_comodo)
-            
-            if caminho:
-                messagebox.showinfo("Sucesso", f"Mapeamento salvo em:\n{caminho}")
-                self.atualizar_texto(f"✓ Mapeamento '{nome}' salvo com sucesso!")
-            else:
-                messagebox.showerror("Erro", "Falha ao salvar o mapeamento")
-        
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro: {e}")
-    
-    def carregar_dados(self):
-        """Abre uma janela pra selecionar um mapeamento salvo"""
-        mapeamentos = listar_mapeamentos()
-        
-        if not mapeamentos:
-            messagebox.showinfo("Aviso", "Nenhum mapeamento salvo encontrado")
-            return
-        
-        # Cria uma janela pra selecionar
-        janela_carregar = tk.Toplevel(self.root)
-        janela_carregar.title("Carregar Mapeamento")
-        janela_carregar.geometry("600x400")
-        
-        # Listbox com os mapeamentos
-        frame_lista = ttk.LabelFrame(janela_carregar, text="Mapeamentos Salvos", padding="10")
-        frame_lista.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        listbox = tk.Listbox(frame_lista, height=12)
-        listbox.pack(fill=tk.BOTH, expand=True)
-        
-        scrollbar = ttk.Scrollbar(frame_lista, orient=tk.VERTICAL, command=listbox.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        listbox.config(yscrollcommand=scrollbar.set)
-        
-        # Preenche a listbox
-        items_map = {}
-        for idx, m in enumerate(mapeamentos):
-            texto = f"{m['nome']} - {m['data']} ({m['comodos']} cômodos)"
-            listbox.insert(tk.END, texto)
-            items_map[idx] = m
-        
-        # Frame de botões
-        frame_buttons_carregar = ttk.Frame(janela_carregar, padding="10")
-        frame_buttons_carregar.pack(fill=tk.X, padx=10, pady=10)
-        
-        def carregar_selecionado():
-            selecao = listbox.curselection()
-            
-            if not selecao:
-                messagebox.showwarning("Aviso", "Selecione um mapeamento")
-                return
-            
-            mapeamento = items_map[selecao[0]]
-            dados = carregar_mapeamento(mapeamento['caminho'])
-            
-            if dados:
-                # Limpa e carrega os dados
-                self.dados_por_comodo = dados['comodos']
-                self.nome_mapeamento_var.set(dados['nome'])
-                self.atualizar_resumo()
-                self.limpar_texto()
-                self.atualizar_texto(f"✓ Mapeamento '{dados['nome']}' carregado!")
-                self.atualizar_texto(f"   Data: {dados['data']}")
-                self.atualizar_texto(f"   Cômodos: {', '.join(self.dados_por_comodo.keys())}")
-                
-                # Habilita botões
-                self.btn_graficos.config(state=tk.NORMAL)
-                self.btn_exportar.config(state=tk.NORMAL)
-                self.btn_salvar.config(state=tk.NORMAL)
-                
-                janela_carregar.destroy()
-            else:
-                messagebox.showerror("Erro", "Falha ao carregar o mapeamento")
-        
-        def deletar_selecionado():
-            selecao = listbox.curselection()
-            
-            if not selecao:
-                messagebox.showwarning("Aviso", "Selecione um mapeamento")
-                return
-            
-            mapeamento = items_map[selecao[0]]
-            
-            if messagebox.askyesno("Confirmar", f"Deletar '{mapeamento['nome']}'?"):
-                from wifi_dados import deletar_mapeamento
-                if deletar_mapeamento(mapeamento['caminho']):
-                    messagebox.showinfo("Sucesso", "Mapeamento deletado")
-                    janela_carregar.destroy()
-                    self.carregar_dados()
-                else:
-                    messagebox.showerror("Erro", "Falha ao deletar")
-        
-        btn_carregar = ttk.Button(frame_buttons_carregar, text="Carregar", 
-                                  command=carregar_selecionado)
-        btn_carregar.pack(side=tk.LEFT, padx=5)
-        
-        btn_deletar = ttk.Button(frame_buttons_carregar, text="Deletar", 
-                                 command=deletar_selecionado)
-        btn_deletar.pack(side=tk.LEFT, padx=5)
-        
-        btn_cancelar = ttk.Button(frame_buttons_carregar, text="Cancelar", 
-                                  command=janela_carregar.destroy)
-        btn_cancelar.pack(side=tk.LEFT, padx=5)
-    
-    def exportar_excel(self):
-        """Exporta todos os dados para Excel"""
-        if not self.dados_por_comodo:
-            messagebox.showwarning("Aviso", "Nenhum dado coletado para exportar")
-            return
-        
-        try:
-            import pandas as pd
-        except ImportError:
-            messagebox.showerror("Erro", "pandas não instalado. Execute: pip install pandas openpyxl")
-            return
-        
-        arquivo = filedialog.asksaveasfilename(
-            defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-        )
-        
-        if not arquivo:
-            return
-        
-        try:
-            with pd.ExcelWriter(arquivo, engine='openpyxl') as writer:
-                # Cria uma aba pra cada cômodo
-                for comodo, dados in self.dados_por_comodo.items():
-                    df = pd.DataFrame(dados)
-                    df.to_excel(writer, sheet_name=comodo[:31], index=False)
-                
-                # Cria uma aba de resumo
-                resumo_data = []
-                for comodo, dados in self.dados_por_comodo.items():
-                    forcas = [d['forca'] for d in dados]
-                    resumo_data.append({
-                        'Cômodo': comodo,
-                        'Mínimo (%)': min(forcas),
-                        'Máximo (%)': max(forcas),
-                        'Médio (%)': round(sum(forcas) / len(forcas), 1),
-                        'Medições': len(forcas)
-                    })
-                
-                df_resumo = pd.DataFrame(resumo_data)
-                df_resumo.to_excel(writer, sheet_name='Resumo', index=False)
-            
-            messagebox.showinfo("Sucesso", f"Mapeamento exportado para:\n{arquivo}")
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao exportar: {e}")
 
-# Executa a aplicação
+    def proximo_comodo(self):
+        self.comodo_var.set("")
+        self.entry_comodo.focus_set()
+        self.progress["value"] = 0
+
+    def mostrar_graficos(self):
+        if self.coletando or not self.dados_por_comodo:
+            return
+        window = tk.Toplevel(self.root)
+        window.title("BatSignal — Gráficos")
+        window.geometry("1150x750")
+        notebook = ttk.Notebook(window)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        for title, build in (("Leituras", criar_grafico_linha), ("Médias", criar_grafico_barras)):
+            frame = ttk.Frame(notebook)
+            notebook.add(frame, text=title)
+            build(self.dados_por_comodo, frame)
+
+    def _show_error(self, title, error):
+        logger.exception("%s failed", title)
+        messagebox.showerror(title, str(error), parent=self.root)
+
+    def salvar_dados(self):
+        if self.coletando or not self.dados_por_comodo:
+            return False
+        try:
+            path = salvar_mapeamento(self.nome_mapeamento_var.get().strip(), self.dados_por_comodo)
+        except (OSError, ValueError) as exc:
+            self._show_error("Salvar", exc)
+            return False
+        self.dirty = False
+        self.atualizar_texto(f"Mapeamento salvo: {path}")
+        return True
+
+    def _confirm_unsaved(self):
+        if not self.dirty:
+            return True
+        answer = messagebox.askyesnocancel(
+            "Dados não salvos", "Salvar o mapeamento atual antes de continuar?", parent=self.root
+        )
+        if answer is None:
+            return False
+        return self.salvar_dados() if answer else True
+
+    def carregar_dados(self):
+        if self.coletando:
+            return
+        try:
+            surveys = listar_mapeamentos()
+        except OSError as exc:
+            self._show_error("Carregar", exc)
+            return
+        window = tk.Toplevel(self.root)
+        window.title("Carregar mapeamento")
+        window.geometry("750x400")
+        window.transient(self.root)
+        window.grab_set()
+        ttk.Label(window, text="Escolha um mapeamento ou importe um arquivo JSON.").pack(pady=10)
+        listing = tk.Listbox(window)
+        listing.pack(fill="both", expand=True, padx=12)
+        for survey in surveys:
+            listing.insert(
+                "end", f"{survey['nome']} — {survey['data']} ({survey['comodos']} cômodos)"
+            )
+        ttk.Label(
+            window, text="Arquivos inválidos são ignorados na lista e registrados no log."
+        ).pack(pady=5)
+
+        def load(path=None):
+            if path is None:
+                selected = listing.curselection()
+                if not selected:
+                    return
+                path = surveys[selected[0]]["caminho"]
+            try:
+                data = carregar_mapeamento(path)
+            except (OSError, ValueError) as exc:
+                self._show_error("Carregar", exc)
+                return
+            window.grab_release()
+            if not self._confirm_unsaved():
+                window.grab_set()
+                return
+            self.dados_por_comodo = data["comodos"]
+            self.nome_mapeamento_var.set(data["nome"])
+            self.comodo_atual = None
+            self.dirty = False
+            self.atualizar_resumo()
+            self._set_controls()
+            self.limpar_texto()
+            self.atualizar_texto(f"Mapeamento carregado: {data['nome']}")
+            window.destroy()
+
+        def import_file():
+            path = filedialog.askopenfilename(parent=window, filetypes=[("JSON", "*.json")])
+            if path:
+                load(path)
+
+        def delete():
+            selected = listing.curselection()
+            if not selected:
+                return
+            index = selected[0]
+            if not messagebox.askyesno(
+                "Excluir", "Excluir permanentemente este JSON?", parent=window
+            ):
+                return
+            try:
+                deletar_mapeamento(surveys[index]["caminho"])
+            except (OSError, ValueError) as exc:
+                self._show_error("Excluir", exc)
+                return
+            surveys.pop(index)
+            listing.delete(index)
+
+        actions = ttk.Frame(window, padding=10)
+        actions.pack()
+        for text, command in (
+            ("Carregar", load),
+            ("Importar JSON", import_file),
+            ("Excluir", delete),
+            ("Fechar", window.destroy),
+        ):
+            ttk.Button(actions, text=text, command=command).pack(side="left", padx=4)
+
+    def exportar_excel(self):
+        if self.coletando or not self.dados_por_comodo:
+            return
+        path = filedialog.asksaveasfilename(
+            parent=self.root, defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")]
+        )
+        if not path:
+            return
+        try:
+            exportar_mapeamento_excel(path, self.dados_por_comodo)
+        except (OSError, ValueError) as exc:
+            self._show_error("Exportar", exc)
+            return
+        self.atualizar_texto(f"Excel exportado: {path}")
+
+    def comparar(self):
+        if self.coletando:
+            return
+        paths = []
+        for title in ("Selecione o mapeamento ANTES", "Selecione o mapeamento DEPOIS"):
+            path = filedialog.askopenfilename(
+                parent=self.root,
+                title=title,
+                initialdir=data_directory(),
+                filetypes=[("JSON", "*.json")],
+            )
+            if not path:
+                return
+            paths.append(path)
+        try:
+            before, after = [carregar_mapeamento(path) for path in paths]
+            rows = comparar_mapeamentos(before["comodos"], after["comodos"])
+        except (OSError, ValueError) as exc:
+            self._show_error("Comparar", exc)
+            return
+        window = tk.Toplevel(self.root)
+        window.title(f"Antes: {before['nome']} | Depois: {after['nome']}")
+        window.geometry("1100x750")
+        ttk.Label(
+            window,
+            text=f"{len(rows)} cômodos em comum. Diferenças em pontos percentuais; "
+            "use o mesmo dispositivo e condições de coleta.",
+        ).pack(pady=8)
+        frame = ttk.Frame(window)
+        frame.pack(fill="both", expand=True)
+        criar_grafico_comparacao(before["comodos"], after["comodos"], frame)
+
+    def fechar(self):
+        if self.coletando and not messagebox.askyesno(
+            "Sair", "Cancelar a coleta em andamento e fechar?", parent=self.root
+        ):
+            return
+        if self.coletando and self.dirty:
+            # Saving is disabled during collection. Let the user cancel, then save.
+            messagebox.showinfo(
+                "Dados não salvos",
+                "Cancele a coleta e salve o mapeamento antes de fechar.",
+                parent=self.root,
+            )
+            return
+        if not self._confirm_unsaved():
+            return
+        self._closing = True
+        self._stop.set()
+        self.root.after_cancel(self._poll_id)
+        self.root.destroy()
+
+
+def configure_logging():
+    directory = data_directory()
+    directory.mkdir(parents=True, exist_ok=True)
+    handler = RotatingFileHandler(
+        directory / "batsignal.log", maxBytes=1_000_000, backupCount=2, encoding="utf-8"
+    )
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[handler],
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+
 if __name__ == "__main__":
+    configure_logging()
     root = tk.Tk()
-    app = AppWiFiComodos(root)
+    AppWiFiComodos(root)
     root.mainloop()
