@@ -37,8 +37,13 @@ MANIFEST
 *~
 .DS_Store
 
-# Dados locais (opcional - descomente se quiser ignorar)
-# dados/
+# Local surveys, logs, and test caches
+dados/
+*.log
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Arquivos de sistema
 .DS_Store

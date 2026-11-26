@@ -1,0 +1,355 @@
+{
+  "schema_version": 2,
+  "nome": "Demo - Depois",
+  "data": "2026-04-01T13:00:00-03:00",
+  "comodos": {
+    "Sala": [
+      {
+        "tempo": "12:00:00",
+        "forca": 97,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:05",
+        "forca": 95,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:10",
+        "forca": 98,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:15",
+        "forca": 96,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:20",
+        "forca": 99,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:25",
+        "forca": 97,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:30",
+        "forca": 94,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:35",
+        "forca": 98,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      }
+    ],
+    "Escritório": [
+      {
+        "tempo": "12:00:00",
+        "forca": 80,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:05",
+        "forca": 78,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:10",
+        "forca": 81,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:15",
+        "forca": 79,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:20",
+        "forca": 82,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:25",
+        "forca": 80,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:30",
+        "forca": 77,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:35",
+        "forca": 81,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      }
+    ],
+    "Quarto": [
+      {
+        "tempo": "12:00:00",
+        "forca": 67,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:05",
+        "forca": 65,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:10",
+        "forca": 68,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:15",
+        "forca": 66,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:20",
+        "forca": 69,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:25",
+        "forca": 67,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:30",
+        "forca": 64,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:35",
+        "forca": 68,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      }
+    ],
+    "Cozinha": [
+      {
+        "tempo": "12:00:00",
+        "forca": 62,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:05",
+        "forca": 60,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:10",
+        "forca": 63,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:15",
+        "forca": 61,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:20",
+        "forca": 64,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:25",
+        "forca": 62,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:30",
+        "forca": 59,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:35",
+        "forca": 63,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      }
+    ],
+    "Varanda": [
+      {
+        "tempo": "12:00:00",
+        "forca": 45,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:05",
+        "forca": 43,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:10",
+        "forca": 46,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:15",
+        "forca": 44,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:20",
+        "forca": 47,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:25",
+        "forca": 45,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:30",
+        "forca": 42,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:35",
+        "forca": 46,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      }
+    ],
+    "Corredor": [
+      {
+        "tempo": "12:00:00",
+        "forca": 75,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:05",
+        "forca": 73,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:10",
+        "forca": 76,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:15",
+        "forca": 74,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:20",
+        "forca": 77,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:25",
+        "forca": 75,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:30",
+        "forca": 72,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      },
+      {
+        "tempo": "12:00:35",
+        "forca": 76,
+        "ssid": "Rede de exemplo",
+        "bssid": "02:00:00:00:00:01",
+        "interface": "Wi-Fi"
+      }
+    ]
+  }
+}
